@@ -108,6 +108,9 @@
     ".MJXc-mtd": {"display":"table-cell!important","text-align":"center","padding":".5em 0 0 .5em"},
     ".MJXc-mtr > .MJXc-mtd:first-child": {"padding-left":0},
     ".MJXc-mtr:first-child > .MJXc-mtd": {"padding-top":0},
+    ".MJXc-mlabeledtr": {"display":"table-row!important"},
+    ".MJXc-mlabeledtr > .MJXc-mtd:first-child": {"padding-left":0},
+    ".MJXc-mlabeledtr:first-child > .MJXc-mtd": {"padding-top":0},
     
     ".MJXc-merror": {
       "background-color": "#FFFF88",
@@ -811,6 +814,17 @@
 
     MML.munderover.Augment({
       toCommonHTML: function (span) {
+	var values = this.getValues("displaystyle","accent","accentunder","align");
+	if (!values.displaystyle && this.data[this.base] != null &&
+	    this.data[this.base].CoreMO().Get("movablelimits")) {
+          span = MML.msubsup.prototype.toCommonHTML.call(this,span);
+          //
+          //  Change class to msubsup for CSS rules.
+          //  ### FIXME: should this be handled via adding another class instead?
+          //
+          span.className = span.className.replace(/munderover/,"msubsup");
+          return span;
+        }
         span = this.CHTMLdefaultSpan(span,{childSpans:true, className:"", noBBox:true});
         var obox = this.CHTMLbboxFor(this.over),
             ubox = this.CHTMLbboxFor(this.under),
@@ -857,7 +871,7 @@
         var base = this.data[this.base], sub = this.data[this.sub], sup = this.data[this.sup];
         if (!base) base = {bbox: {h:.8, d:.2}};
         span.firstChild.style.marginRight = ".05em";
-        var h = Math.max(.4,base.CHTML.h-.4);
+        var h = Math.max(.4,base.CHTML.h-.4),
             d = Math.max(.2,base.CHTML.d+.1);
         var bbox = this.CHTML;
         if (sup && sub) {
@@ -1009,7 +1023,7 @@
         //
         var H = this.CHTML.h, D = this.CHTML.d;
         this.CHTMLstretchChild("open",H,D);
-        for (var i = 0, m = this.data.length; i < m; i++) {
+        for (i = 0, m = this.data.length; i < m; i++) {
           this.CHTMLstretchChild("sep"+i,H,D);
           this.CHTMLstretchChild(i,H,D);
         }
@@ -1055,11 +1069,11 @@
         var CSPACE = SPLIT(values.columnspacing),
             RSPACE = SPLIT(values.rowspacing),
             CALIGN = SPLIT(values.columnalign),
-            RALIGN = SPLIT(values.rowalign),
-            CLINES = SPLIT(values.columnlines),
-            RLINES = SPLIT(values.rowlines),
-            CWIDTH = SPLIT(values.columnwidth),
-            RCALIGN = [];
+            RALIGN = SPLIT(values.rowalign);//,
+//            CLINES = SPLIT(values.columnlines),
+//            RLINES = SPLIT(values.rowlines),
+//            CWIDTH = SPLIT(values.columnwidth),
+//            RCALIGN = [];
         for (i = 0, m = CSPACE.length; i < m; i++) {CSPACE[i] = CHTML.length2em(CSPACE[i])}
         for (i = 0, m = RSPACE.length; i < m; i++) {RSPACE[i] = CHTML.length2em(RSPACE[i])}
 
@@ -1073,11 +1087,12 @@
             var rspace = CHTML.arrayEntry(RSPACE,i-1), ralign = CHTML.arrayEntry(RALIGN,i);
             var rbox = row.CHTML, rspan = row.CHTMLspanElement();
             rspan.style.verticalAlign = ralign;
-            for (j = 0, n = row.data.length; j < n; j++) {
-              var cell = row.data[j];
+            var k = (row.type === "mlabeledtr" ? 1 : 0);
+            for (j = 0, n = row.data.length; j < n-k; j++) {
+              var cell = row.data[j+k];
               if (cell) {
                 var cspace = CHTML.arrayEntry(CSPACE,j-1), calign = CHTML.arrayEntry(CALIGN,j);
-                var cbox = cell.CHTML, cspan = cell.CHTMLspanElement();
+                var /*cbox = cell.CHTML,*/ cspan = cell.CHTMLspanElement();
                 if (j) {rbox.w += cspace; cspan.style.paddingLeft = CHTML.Em(cspace)}
                 if (i) cspan.style.paddingTop = CHTML.Em(rspace);
                 cspan.style.textAlign = calign;
@@ -1093,13 +1108,25 @@
         return span;
       }
     });
+    MML.mlabeledtr.Augment({
+      CHTMLdefaultSpan: function (span,options) {
+        if (!options) options = {};
+        span = this.CHTMLcreateSpan(span);
+        this.CHTMLhandleStyle(span);
+        this.CHTMLhandleColor(span);
+        if (this.isToken) this.CHTMLhandleToken(span);
+        // skip label for now
+        for (var i = 1, m = this.data.length; i < m; i++) this.CHTMLaddChild(span,i,options);
+        return span;
+      }
+    });
 
     MML.semantics.Augment({
       toCommonHTML: function (span) {
         span = this.CHTMLcreateSpan(span);
-        if (this.data[i]) {
-          this.data[i].toCommonHTML(span);
-          this.CHTML = this.data[i].CHTML;
+        if (this.data[0]) {
+          this.data[0].toCommonHTML(span);
+          this.CHTML = this.data[0].CHTML;
         }
         return span;
       }
@@ -1110,7 +1137,7 @@
     //
     //  Loading isn't complete until the element jax is modified,
     //  but can't call loadComplete within the callback for "mml Jax Ready"
-    //  (it would call HTMLCSS's Require routine, asking for the mml jax again)
+    //  (it would call CommonHTML's Require routine, asking for the mml jax again)
     //  so wait until after the mml jax has finished processing.
     //  
     //  We also need to wait for the onload handler to run, since the loadComplete
