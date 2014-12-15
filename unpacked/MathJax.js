@@ -47,7 +47,7 @@ if (window.MathJax) {window.MathJax = {AuthorConfig: window.MathJax}}
 
 MathJax.version = "2.4.0";
 MathJax.fileversion = "2.4.0";
-MathJax.cdnVersion = "2.4-beta-2";  // specifies a revision to break caching
+MathJax.cdnVersion = "2.5-alpha-2";  // specifies a revision to break caching
 MathJax.cdnFileVersions = {};       // can be used to specify revisions for individual files
 
 /**********************************************************/
