@@ -36,12 +36,12 @@
 
   MATHML.Parse = MathJax.Object.Subclass({
 
-    Init: function (string) {this.Parse(string)},
+    Init: function (string,script) {this.Parse(string,script)},
     
     //
     //  Parse the MathML and check for errors
     //
-    Parse: function (math) {
+    Parse: function (math,script) {
       var doc;
       if (typeof math !== "string") {doc = math.parentNode} else {
         doc = MATHML.ParseXML(this.preProcessMath.call(this,math));
@@ -63,7 +63,9 @@
             "MathML must be formed by a <math> element, not %1",
             "<"+doc.firstChild.nodeName+">"]);
       }
-      this.mml = this.MakeMML(doc.firstChild);
+      var data = {math:doc.firstChild, script:script};
+      MATHML.DOMfilterHooks.Execute(data);
+      this.mml = this.MakeMML(data.math);
     },
     
     //
@@ -158,8 +160,12 @@
         if (child.nodeName === "#comment") continue;
         if (child.nodeName === "#text") {
           if ((mml.isToken || mml.isChars) && !mml.mmlSelfClosing) {
-            var text = child.nodeValue.replace(/&([a-z][a-z0-9]*);/ig,this.replaceEntity);
-            mml.Append(MML.chars(this.trimSpace(text)));
+            var text = child.nodeValue;
+            if (mml.isToken) {
+              text = text.replace(/&([a-z][a-z0-9]*);/ig,this.replaceEntity);
+              text = this.trimSpace(text);
+            }
+            mml.Append(MML.chars(text));
           } else if (child.nodeValue.match(/\S/)) {
             MATHML.Error(["UnexpectedTextNode",
               "Unexpected text node: %1","'"+child.nodeValue+"'"]);
@@ -238,8 +244,9 @@
   MATHML.Augment({
     sourceMenuTitle: /*_(MathMenu)*/ ["OriginalMathML","Original MathML"],
     
-    prefilterHooks:    MathJax.Callback.Hooks(true),   // hooks to run before processing MathML
-    postfilterHooks:   MathJax.Callback.Hooks(true),   // hooks to run after processing MathML
+    prefilterHooks:    MathJax.Callback.Hooks(true),   // hooks to run on MathML string before processing MathML
+    DOMfilterHooks:    MathJax.Callback.Hooks(true),   // hooks to run on MathML DOM before processing
+    postfilterHooks:   MathJax.Callback.Hooks(true),   // hooks to run on internal jax format after processing MathML
 
     Translate: function (script) {
       if (!this.ParseXML) {this.ParseXML = this.createParser()}
@@ -255,7 +262,7 @@
       var callback = this.prefilterHooks.Execute(data); if (callback) return callback;
       math = data.math;
       try {
-        mml = MATHML.Parse(math).mml;
+        mml = MATHML.Parse(math,script).mml;
       } catch(err) {
         if (!err.mathmlError) {throw err}
         mml = this.formatError(err,math,script);
